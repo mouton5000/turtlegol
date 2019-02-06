@@ -5,7 +5,7 @@ import re
 
 pop = set()
 
-CELL_SIZE = 5
+CELL_SIZE = 15
 WIDTH = 1280
 HEIGHT = 1280
 MAXX = WIDTH / (2 * CELL_SIZE)
@@ -32,14 +32,14 @@ pause = True
 
 def do_iterate_handler():
     if pause:
-        iterate()
+        iterate_draw()
 
 
 def auto_handler():
     global pause
     pause = not pause
     while not pause:
-        iterate()
+        iterate_draw()
         
 
 def add_cell(x, y):
@@ -66,13 +66,21 @@ def toggle_cell(x, y):
 iteration = 0
 
 
-def iterate():
+def iterate_draw():
     global iteration
-    iteration += 1
-    print('Iteration', iteration)
     t.clear()
+    print('Iteration', iteration)
+    iteration += 1
+    nextpop = iterate(pop)
+    pop.clear()
+    for c in nextpop:
+        add_cell(*c)
+    draw()
+
+
+def iterate(coords):
     neighcount = defaultdict(int)
-    for x, y in pop:
+    for x, y in coords:
         for nx, ny in neigh(x, y):
             neighcount[(nx, ny)] += 1
     nextpop = set()
@@ -81,12 +89,9 @@ def iterate():
             continue
         if v == 3:
             nextpop.add(c)
-        if v == 2 and c in pop:
+        if v == 2 and c in coords:
             nextpop.add(c)
-    pop.clear()
-    for c in nextpop:
-        add_cell(*c)
-    draw()
+    return nextpop
 
 
 screen = turtle.Screen()
@@ -121,6 +126,7 @@ def draw_cell_color(x, y, col):
     t.setpos(cx, cy)
     t.end_fill()
     t.penup()
+    print(cx, cy, col)
 
 
 def draw_cell(x, y):
@@ -195,7 +201,7 @@ def _cpx_desc(x, y, filename):
 
     with open(filename, 'r') as f:
         for line in f:
-            m = re.match('(-?\d+) (-?\d+) (.+) (True|False) (True|False) (-?\d+)', line)
+            m = re.match('(-?\d+) (-?\d+) (.+) (True|False) (True|False) (-?\d+) (\d+)', line)
             if m is not None:
                 x1 = int(m.group(1))
                 y1 = int(m.group(2))
@@ -208,7 +214,9 @@ def _cpx_desc(x, y, filename):
                 symx1 = m.group(4) == 'True'
                 symy1 = m.group(5) == 'True'
                 rot1 = int(m.group(6))
-                coords1, anticoords1 = _transform(coords1, anticoords1, symx1, symy1, rot1)
+                time = int(m.group(7))
+
+                coords1, anticoords1 = _transform(coords1, anticoords1, symx1, symy1, rot1, time)
 
                 coords += coords1
                 anticoords += anticoords1
@@ -218,7 +226,7 @@ def _cpx_desc(x, y, filename):
     return coords, anticoords
 
 
-def _transform(coords, anticoords, symx, symy, rot):
+def _transform(coords, anticoords, symx, symy, rot, time):
 
     if len(coords) == 0:
         if len(anticoords) == 0:
@@ -241,6 +249,23 @@ def _transform(coords, anticoords, symx, symy, rot):
         xmax = max(i, xmax)
         ymin = min(j, ymin)
         ymax = max(j, ymax)
+
+    print(coords)
+    for t in range(time):
+        coords = iterate(coords)
+        print(coords)
+
+    for i, j in coords:
+        xmin = min(i, xmin)
+        xmax = max(i, xmax)
+        ymin = min(j, ymin)
+        ymax = max(j, ymax)
+
+    del anticoords[:]
+    for i in range(xmin, xmax+1):
+        for j in range(ymin, ymax+1):
+            if (i, j) not in coords:
+                anticoords.append((i, j))
 
     width = xmax - xmin + 1
     height = ymax - ymin + 1
@@ -277,14 +302,17 @@ def _get_desc(x, y, filename):
     else:
         return _plain_text_desc(x, y, filename)
 
-def add_file(x, y, filename, symx=False, symy=False, rot=0):
+
+def add_file(x, y, filename, symx=False, symy=False, rot=0, time=0):
     '''Lit le fichier filename (format plaintext ou rle) et dessine le contenu aux coordonnées indiquées. Si symx est
     vrai, effectue une symétrie axiale par rapport à l'axe vertical. Si symy est vrai, par rapport à l'axe horizontal.
     Enfin rot gère la rotation: une rotation d'angle rot * pi / 2 est effectuée. Le rotation est effectuée après les
     symétries.'''
 
     coords, anticoords = _get_desc(x, y, filename)
-    coords, anticoords = _transform(coords, anticoords, symx, symy, rot)
+    coords, anticoords = _transform(coords, anticoords, symx, symy, rot, time)
+
+    print(coords, anticoords)
 
     for i, j in coords:
         add_cell(i, j)
@@ -300,7 +328,12 @@ def add_glider_to_duplicator_1(xdupp, ydupp, dist):
 
 
 if __name__ == '__main__':
-    add_file(0, 0, 'eaters/eater1.rle')
-    add_file(-22, 3, 'spaceships/lwss.rle', rot=2)
+    # add_file(0, 50, 'others/lwssgun_with_eater.cpx')
+    # add_file(-49, 2, 'others/lwssgun_with_eater.cpx', symy=True, time=2)
+    # add_file(74, 25, 'spaceships/glider', rot=2)
+    add_file(0, 0, 'spaceships/glider')
+    add_file(10, 0, 'spaceships/glider', time=1)
+    add_file(20, 0, 'spaceships/glider', time=2)
+    add_file(30, 0, 'spaceships/glider', time=3)
     draw()
     screen.mainloop()
