@@ -5,7 +5,7 @@ import re
 
 pop = set()
 
-CELL_SIZE = 15
+CELL_SIZE = 5
 WIDTH = 1280
 HEIGHT = 1280
 MAXX = WIDTH / (2 * CELL_SIZE)
@@ -126,7 +126,6 @@ def draw_cell_color(x, y, col):
     t.setpos(cx, cy)
     t.end_fill()
     t.penup()
-    print(cx, cy, col)
 
 
 def draw_cell(x, y):
@@ -250,10 +249,8 @@ def _transform(coords, anticoords, symx, symy, rot, time):
         ymin = min(j, ymin)
         ymax = max(j, ymax)
 
-    print(coords)
     for t in range(time):
         coords = iterate(coords)
-        print(coords)
 
     for i, j in coords:
         xmin = min(i, xmin)
@@ -312,7 +309,6 @@ def add_file(x, y, filename, symx=False, symy=False, rot=0, time=0):
     coords, anticoords = _get_desc(x, y, filename)
     coords, anticoords = _transform(coords, anticoords, symx, symy, rot, time)
 
-    print(coords, anticoords)
 
     for i, j in coords:
         add_cell(i, j)
@@ -328,12 +324,11 @@ def add_glider_to_duplicator_1(xdupp, ydupp, dist):
 
 
 if __name__ == '__main__':
+    add_file(-50, 50, 'guns/lwssgun')
+    add_file(-50, -50, 'guns/p46gliderlesslwssgun.rle')
+
     # add_file(0, 50, 'others/lwssgun_with_eater.cpx')
-    # add_file(-49, 2, 'others/lwssgun_with_eater.cpx', symy=True, time=2)
+    # add_file(-49, 3, 'others/lwssgun_with_eater.cpx', symy=True, time=2)
     # add_file(74, 25, 'spaceships/glider', rot=2)
-    add_file(0, 0, 'spaceships/glider')
-    add_file(10, 0, 'spaceships/glider', time=1)
-    add_file(20, 0, 'spaceships/glider', time=2)
-    add_file(30, 0, 'spaceships/glider', time=3)
     draw()
     screen.mainloop()

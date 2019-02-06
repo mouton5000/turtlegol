@@ -11,6 +11,10 @@
 # add_file(0, 0, 'eaters/eater1.rle')
 # add_file(-22, 3, 'spaceships/lwss.rle', rot=2)
 #
+# Eat LWSS gun
+# add_file(0, 0, 'guns/lwssgun')
+# add_file(100, -20, 'eaters/eater1.rle')
+#
 #
 x = 4, y = 4, rule = B3/S23
 2o2b$obob$2bob$2b2o!
