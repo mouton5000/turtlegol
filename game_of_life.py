@@ -5,7 +5,7 @@ import re
 
 pop = set()
 
-CELL_SIZE = 15
+CELL_SIZE = 5
 WIDTH = 1280
 HEIGHT = 1280
 MAXX = WIDTH / (2 * CELL_SIZE)
@@ -135,43 +135,24 @@ def draw():
     turtle.update()
 
 
-def _plain_text_desc(x, y, filename, symx, symy, rot):
+def _plain_text_desc(x, y, filename):
+    coords = []
+    anticoords = []
     with open(filename, 'r') as f:
-        line = f.readline()
-        width, height = (int(x) for x in line.split())
-        binx, biny = int(symx), int(symy)
-
-        def coords(i, j):
-            ci, cj = (1 - 2 * binx) * i + binx * (width - 1), \
-                   (1 - 2 * biny) * j + biny * (height - 1)
-            if rot == 0:
-                return x + ci, y - cj
-            else:
-                return x + (height - 1 - cj), y - ci
 
         for j, line in enumerate(f):
             for i, c in enumerate(line[:-1]):
                 if c == '1':
-                    add_cell(*coords(i, j))
+                    coords.append((x + i, y - j))
                 else:
-                    remove_cell(*coords(i, j))
+                    anticoords.append((x + i, y - j))
+    return coords, anticoords
+
     
-    
-def _rle_desc(x, y, filename, symx, symy, rot):
+def _rle_desc(x, y, filename):
+    coords = []
+    anticoords = []
     with open(filename, 'r') as f:
-
-        width = None
-        height = None
-        binx, biny = int(symx), int(symy)
-
-        def coords(i, j):
-            ci, cj = (1 - 2 * binx) * i + binx * (width - 1), \
-                   (1 - 2 * biny) * j + biny * (height - 1)
-            if rot == 0:
-                return x + ci, y - cj
-            else:
-                return x + (height - 1 - cj), y - ci
-
         i = 0
         j = 0
         value = 0
@@ -179,72 +160,91 @@ def _rle_desc(x, y, filename, symx, symy, rot):
             line = line.strip()
             if line[0] == '#':
                 continue
-            if width is None:
-                m = re.match('x = (\d+), y = (\d+)', line)
-                if m is None:
+            if re.match('x = (\d+), y = (\d+)', line):
+                continue
+
+            for c in line:
+                if c == '$':
+                    if value == 0:
+                        value = 1
+                    j += value
+                    i = 0
+                    value = 0
+                elif c == '!':
+                    return coords, anticoords
+                elif c in ('o', 'b'):
+                    if value == 0:
+                        value = 1
+                    l = anticoords if c == 'b' else coords
+                    for k in range(i, i + value):
+                        l.append((x + k, y - j))
+                    i += value
+                    value = 0
+                elif c == '\n':
                     continue
-                width = int(m.group(1))
-                height = int(m.group(2))
-            else:
-                for c in line:
-                    if c == '$':
-                        if value == 0:
-                            value = 1
-                        j += value
-                        i = 0
-                        value = 0
-                    elif c == '!':
-                        return
-                    elif c in ('o', 'b'):
-                        if value == 0:
-                            value = 1
-                        fun = remove_cell if c == 'b' else add_cell
-                        for k in range(i, i + value):
-                            fun(*coords(k, j))
-                        i += value
-                        value = 0
-                    elif c == '\n':
-                        continue
-                    else:
-                        value = value * 10 + int(c)
+                else:
+                    value = value * 10 + int(c)
 
 
-def _cpx_desc(x, y, filename, symx, symy, rot):
+def _cpx_desc(x, y, filename):
+    coords = []
+    anticoords = []
+
+    minx = 0
+    maxy = 0
+
     with open(filename, 'r') as f:
-        line = f.readline()
-        width, height = (int(x) for x in line.split())
-        binx, biny = int(symx), int(symy)
-
-        def coords(i, j):
-            ci, cj = (1 - 2 * binx) * i + binx * (width - 1), \
-                     (1 - 2 * biny) * j + biny * (height - 1)
-            if rot == 0:
-                return x + ci, y - cj
-            else:
-                return x + (height - 1 - cj), y - ci
-
         for line in f:
             m = re.match('(-?\d+) (-?\d+) (.+) (True|False) (True|False) (-?\d+)', line)
             if m is not None:
-                i1 = int(m.group(1))
-                j1 = -int(m.group(2))
-                x1, y1 = coords(i1, j1)
+                x1 = int(m.group(1))
+                y1 = int(m.group(2))
+                minx = min(minx, x1)
+                maxy = max(maxy, y1)
 
                 filename1 = m.group(3)
+                coords1, anticoords1 = _get_desc(x + x1, y + y1, filename1)
+
                 symx1 = m.group(4) == 'True'
                 symy1 = m.group(5) == 'True'
                 rot1 = int(m.group(6))
-                add_file(x1, y1, filename1, (symx and not symx1) or (not symx and symx1),
-                         (symy and not symy1) or (not symy and symy1), rot1)
+                coords1, anticoords1 = _transform(coords1, anticoords1, symx1, symy1, rot1)
+
+                coords += coords1
+                anticoords += anticoords1
+
+    coords = [(i - minx, j - maxy) for i, j in coords]
+    anticoords = [(i - minx, j - maxy) for i, j in anticoords]
+    return coords, anticoords
 
 
-def add_file(x, y, filename, symx=False, symy=False, rot=0):
-    '''Lit le fichier filename (format plaintext ou rle) et dessine le contenu aux coordonnées indiquées. Si symx est
-    vrai, effectue une symétrie axiale par rapport à l'horizontal. Si symy est vrai, par rapport à la verticale. Enfin
-    rot gère la rotation: une rotation d'angle rot * pi / 4 est effectuée. Le rotation est effectuée après les
-    symétries.'''
+def _transform(coords, anticoords, symx, symy, rot):
 
-    print(x, y, filename, symx, symy, rot)
+    if len(coords) == 0:
+        if len(anticoords) == 0:
+            return coords, anticoords
+        else:
+            xmin = xmax = anticoords[0][0]
+            ymin = ymax = anticoords[0][1]
+    else:
+        xmin = xmax = coords[0][0]
+        ymin = ymax = coords[0][1]
+
+    for i, j in coords:
+        xmin = min(i, xmin)
+        xmax = max(i, xmax)
+        ymin = min(j, ymin)
+        ymax = max(j, ymax)
+
+    for i, j in anticoords:
+        xmin = min(i, xmin)
+        xmax = max(i, xmax)
+        ymin = min(j, ymin)
+        ymax = max(j, ymax)
+
+    width = xmax - xmin + 1
+    height = ymax - ymin + 1
+
     while rot >= 2:
         rot -= 2
         symx = not symx
@@ -254,12 +254,42 @@ def add_file(x, y, filename, symx=False, symy=False, rot=0):
         symx = not symx
         symy = not symy
 
+    binx, biny = int(symx), int(symy)
+
+    def transform_coords(i, j):
+        ci, cj = (1 - 2 * binx) * i + binx * (width - 1), \
+               (1 - 2 * biny) * j + biny * (height - 1)
+        if rot == 0:
+            return xmin + ci, ymax - cj
+        else:
+            # return xmin + (height - 1 - cj), ymax - ci
+            return xmin + cj, ymax - (width - 1 - ci)
+    coords = [transform_coords(i - xmin, ymax - j) for i, j in coords]
+    anticoords = [transform_coords(i - xmin, ymax - j) for i, j in anticoords]
+    return coords, anticoords
+
+
+def _get_desc(x, y, filename):
     if filename.endswith('rle'):
-        _rle_desc(x, y, filename, symx, symy, rot)
+        return _rle_desc(x, y, filename)
     elif filename.endswith('cpx'):
-        _cpx_desc(x, y, filename, symx, symy, rot)
+        return _cpx_desc(x, y, filename)
     else:
-        _plain_text_desc(x, y, filename, symx, symy, rot)
+        return _plain_text_desc(x, y, filename)
+
+def add_file(x, y, filename, symx=False, symy=False, rot=0):
+    '''Lit le fichier filename (format plaintext ou rle) et dessine le contenu aux coordonnées indiquées. Si symx est
+    vrai, effectue une symétrie axiale par rapport à l'axe vertical. Si symy est vrai, par rapport à l'axe horizontal.
+    Enfin rot gère la rotation: une rotation d'angle rot * pi / 2 est effectuée. Le rotation est effectuée après les
+    symétries.'''
+
+    coords, anticoords = _get_desc(x, y, filename)
+    coords, anticoords = _transform(coords, anticoords, symx, symy, rot)
+
+    for i, j in coords:
+        add_cell(i, j)
+    for i, j in anticoords:
+        remove_cell(i, j)
 
 
 def add_glider_to_duplicator_1(xdupp, ydupp, dist):
@@ -270,7 +300,7 @@ def add_glider_to_duplicator_1(xdupp, ydupp, dist):
 
 
 if __name__ == '__main__':
-    add_file(0, 0, 'others/test.cpx')
-    add_file(0, -10, 'others/test.cpx', symy=True)
+    add_file(0, 0, 'eaters/eater1.rle')
+    add_file(-22, 3, 'spaceships/lwss.rle', rot=2)
     draw()
     screen.mainloop()
