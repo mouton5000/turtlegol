@@ -45,6 +45,21 @@ def auto_handler():
         time.sleep(1/FPS)
 
 
+def print_grid():
+    minX = min(x for x, y in pop)
+    minY = min(y for x, y in pop)
+    maxX = max(x for x, y in pop)
+    maxY = max(y for x, y in pop)
+    print(maxX - minX + 1, maxY - minY + 1)
+    for y in range(maxY, minY - 1, -1):
+        for x in range(minX, maxX + 1):
+            if (x, y) in pop:
+                print(1, end='')
+            else:
+                print(0, end='')
+        print()
+
+
 def add_cell(x, y):
     if (x, y) not in pop:
         pop.add((x, y))
@@ -99,6 +114,7 @@ screen_x, screen_y = screen.screensize()
 screen.onclick(click_handler)
 screen.onkey(do_iterate_handler, 'n')
 screen.onkey(auto_handler, 'a')
+screen.onkey(print_grid, 's')
 screen.listen()
 turtle.tracer(0, 0)
 t = turtle.Turtle(visible=False)
@@ -273,7 +289,7 @@ def add_glider_to_duplicator_1(xdupp, ydupp, dist):
 
 
 if __name__ == '__main__':
-    add_file(0, 0, 'others/test.cpx')
-    add_file(0, -10, 'others/test.cpx', symy=True)
+    # add_file(0, 0, 'others/glider_to_lwss.cpx')
+    add_file(0, 0, 'guns/gliderlwssgun.cpx')
     draw()
     screen.mainloop()
