@@ -5,13 +5,14 @@ import re
 
 pop = set()
 
-CELL_SIZE = 15
+CELL_SIZE = 3
 WIDTH = 1280
 HEIGHT = 1280
 MAXX = WIDTH / (2 * CELL_SIZE)
 MAXY = HEIGHT / (2 * CELL_SIZE)
 MINX = -MAXX
 MINY = -MAXY
+FPS = 60
 
 
 def neigh(x, y):
@@ -40,7 +41,9 @@ def auto_handler():
     pause = not pause
     while not pause:
         iterate()
-        
+        import time
+        time.sleep(1/FPS)
+
 
 def add_cell(x, y):
     if (x, y) not in pop:
