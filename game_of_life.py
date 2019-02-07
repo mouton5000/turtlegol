@@ -159,7 +159,7 @@ def draw():
     turtle.update()
 
 
-def _plain_text_desc(x, y, filename):
+def _plain_text_desc(filename):
     coords = []
     anticoords = []
     with open(filename, 'r') as f:
@@ -167,13 +167,13 @@ def _plain_text_desc(x, y, filename):
         for j, line in enumerate(f):
             for i, c in enumerate(line[:-1]):
                 if c == '1':
-                    coords.append((x + i, y - j))
+                    coords.append((i, -j))
                 else:
-                    anticoords.append((x + i, y - j))
+                    anticoords.append((i, -j))
     return coords, anticoords
 
     
-def _rle_desc(x, y, filename):
+def _rle_desc(filename):
     coords = []
     anticoords = []
     with open(filename, 'r') as f:
@@ -201,7 +201,7 @@ def _rle_desc(x, y, filename):
                         value = 1
                     l = anticoords if c == 'b' else coords
                     for k in range(i, i + value):
-                        l.append((x + k, y - j))
+                        l.append((k, -j))
                     i += value
                     value = 0
                 elif c == '\n':
@@ -210,12 +210,9 @@ def _rle_desc(x, y, filename):
                     value = value * 10 + int(c)
 
 
-def _cpx_desc(x, y, filename):
+def _cpx_desc(filename):
     coords = []
     anticoords = []
-
-    minx = 0
-    maxy = 0
 
     with open(filename, 'r') as f:
         for line in f:
@@ -223,11 +220,9 @@ def _cpx_desc(x, y, filename):
             if m is not None:
                 x1 = int(m.group(1))
                 y1 = int(m.group(2))
-                minx = min(minx, x1)
-                maxy = max(maxy, y1)
 
                 filename1 = m.group(3)
-                coords1, anticoords1 = _get_desc(x + x1, y + y1, filename1)
+                coords1, anticoords1 = _get_desc(filename1)
 
                 symx1 = m.group(4) == 'True'
                 symy1 = m.group(5) == 'True'
@@ -235,12 +230,10 @@ def _cpx_desc(x, y, filename):
                 time = int(m.group(7))
 
                 coords1, anticoords1 = _transform(coords1, anticoords1, symx1, symy1, rot1, time)
+                coords1, anticoords1 = _offset(x1, y1, coords1, anticoords1)
 
                 coords += coords1
                 anticoords += anticoords1
-
-    coords = [(i - minx, j - maxy) for i, j in coords]
-    anticoords = [(i - minx, j - maxy) for i, j in anticoords]
     return coords, anticoords
 
 
@@ -303,20 +296,50 @@ def _transform(coords, anticoords, symx, symy, rot, time):
         if rot == 0:
             return xmin + ci, ymax - cj
         else:
-            # return xmin + (height - 1 - cj), ymax - ci
             return xmin + cj, ymax - (width - 1 - ci)
+
     coords = [transform_coords(i - xmin, ymax - j) for i, j in coords]
     anticoords = [transform_coords(i - xmin, ymax - j) for i, j in anticoords]
+
     return coords, anticoords
 
 
-def _get_desc(x, y, filename):
+def _get_desc(filename):
     if filename.endswith('rle'):
-        return _rle_desc(x, y, filename)
+        return _rle_desc(filename)
     elif filename.endswith('cpx'):
-        return _cpx_desc(x, y, filename)
+        return _cpx_desc(filename)
     else:
-        return _plain_text_desc(x, y, filename)
+        return _plain_text_desc(filename)
+
+
+def _offset(x, y, coords, anticoords):
+
+    if len(coords) == 0:
+        if len(anticoords) == 0:
+            return coords, anticoords
+        else:
+            xmin = xmax = anticoords[0][0]
+            ymin = ymax = anticoords[0][1]
+    else:
+        xmin = xmax = coords[0][0]
+        ymin = ymax = coords[0][1]
+
+    for i, j in coords:
+        xmin = min(i, xmin)
+        xmax = max(i, xmax)
+        ymin = min(j, ymin)
+        ymax = max(j, ymax)
+
+    for i, j in anticoords:
+        xmin = min(i, xmin)
+        xmax = max(i, xmax)
+        ymin = min(j, ymin)
+        ymax = max(j, ymax)
+
+    coords = [(i + x - xmin, j + y - ymax) for i, j in coords]
+    anticoords = [(i + x - xmin, j + y - ymax) for i, j in anticoords]
+    return coords, anticoords
 
 
 def add_file(x, y, filename, symx=False, symy=False, rot=0, time=0):
@@ -325,9 +348,9 @@ def add_file(x, y, filename, symx=False, symy=False, rot=0, time=0):
     Enfin rot gère la rotation: une rotation d'angle rot * pi / 2 est effectuée. Le rotation est effectuée après les
     symétries.'''
 
-    coords, anticoords = _get_desc(x, y, filename)
+    coords, anticoords = _get_desc(filename)
     coords, anticoords = _transform(coords, anticoords, symx, symy, rot, time)
-
+    coords, anticoords = _offset(x, y, coords, anticoords)
 
     for i, j in coords:
         add_cell(i, j)
@@ -343,11 +366,9 @@ def add_glider_to_duplicator_1(xdupp, ydupp, dist):
 
 
 if __name__ == '__main__':
-    add_file(-50, 50, 'guns/lwssgun')
-    add_file(-50, -50, 'guns/p46gliderlesslwssgun.rle')
-
-    # add_file(0, 50, 'others/lwssgun_with_eater.cpx')
-    # add_file(-49, 3, 'others/lwssgun_with_eater.cpx', symy=True, time=2)
-    # add_file(74, 25, 'spaceships/glider', rot=2)
+    # add_file(-50, 50, 'guns/gliderlwssgun.cpx', rot=-1, time=300)
+    # add_file(100, 4, 'eaters/eater1.rle')
+    # add_file(51, -5, 'spaceships/glider.rle', rot=2)
+    add_file(-75, 75, 'guns/p144gliderlwssgun.cpx', time=180)
     draw()
     screen.mainloop()
