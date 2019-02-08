@@ -5,14 +5,12 @@ import re
 
 pop = set()
 
-CELL_SIZE = 5
+CELL_SIZE = 50
 WIDTH = 1280
 HEIGHT = 1280
-MAXX = WIDTH / (2 * CELL_SIZE)
-MAXY = HEIGHT / (2 * CELL_SIZE)
-MINX = -MAXX
-MINY = -MAXY
-FPS = 60
+CENTERX = 0
+CENTERY = 0
+FPS = 100
 
 
 def neigh(x, y):
@@ -23,9 +21,9 @@ def neigh(x, y):
 
 
 def click_handler(cx, cy):
-    x, y = cx // CELL_SIZE, cy // CELL_SIZE
-    print(x, y)
+    x, y = cx // CELL_SIZE + CENTERX, cy // CELL_SIZE + CENTERY
     toggle_cell(x, y)
+    draw()
 
 
 pause = True
@@ -34,6 +32,59 @@ pause = True
 def do_iterate_handler():
     if pause:
         iterate_draw()
+
+
+drawinfos = False
+
+
+def toggle_infos():
+    global drawinfos
+    drawinfos = not drawinfos
+    if drawinfos:
+        draw()
+    else:
+        redraw()
+
+
+def zoom_in():
+    global CELL_SIZE
+    if CELL_SIZE < 100:
+        CELL_SIZE += 5
+    redraw()
+
+
+def zoom_out():
+    global CELL_SIZE
+    if CELL_SIZE > 5:
+        CELL_SIZE -= 5
+    redraw()
+
+
+MOVE_PIXELS = 100
+
+
+def move_center(movex, movey):
+    global CENTERX, CENTERY
+    move = MOVE_PIXELS / CELL_SIZE
+    CENTERX += movex * move
+    CENTERY += movey * move
+    redraw()
+
+
+def goleft():
+    move_center(-1, 0)
+
+
+def goright():
+    move_center(1, 0)
+
+
+def goup():
+    move_center(0, 1)
+
+
+def godown():
+    move_center(0, -1)
 
 
 def auto_handler():
@@ -84,6 +135,15 @@ def toggle_cell(x, y):
 iteration = 0
 
 
+def redraw():
+    t.clear()
+    nextpop = set(pop)
+    pop.clear()
+    for c in nextpop:
+        add_cell(*c)
+    draw()
+
+
 def iterate_draw():
     global iteration
     t.clear()
@@ -94,6 +154,32 @@ def iterate_draw():
     for c in nextpop:
         add_cell(*c)
     draw()
+
+
+def draw_infos():
+
+    bottom = 150
+    height = 5
+
+    t.color('white')
+    t.setpos(-WIDTH / 2, HEIGHT / 2 - bottom - height)
+    t.pendown()
+    t.begin_fill()
+    t.setpos(WIDTH / 2, HEIGHT / 2 - bottom - height)
+    t.setpos(WIDTH / 2, HEIGHT / 2)
+    t.setpos(-WIDTH / 2, HEIGHT / 2)
+    t.setpos(-WIDTH / 2, HEIGHT / 2 - bottom - height)
+    t.end_fill()
+    t.penup()
+
+    t.color('black')
+    t.setpos(-WIDTH / 2, HEIGHT / 2 - bottom - height)
+    t.pendown()
+    t.setpos(WIDTH / 2, HEIGHT / 2 - bottom - height)
+    t.penup()
+
+    t.goto(-WIDTH / 2 + 10, HEIGHT / 2 - bottom)
+    t.write('X : %d ; Y : %d ; ZOOM : %d' % (CENTERX, CENTERY, CELL_SIZE))
 
 
 def iterate(coords):
@@ -120,6 +206,13 @@ screen.onclick(click_handler)
 screen.onkey(do_iterate_handler, 'n')
 screen.onkey(auto_handler, 'a')
 screen.onkey(print_grid, 's')
+screen.onkey(toggle_infos, 'i')
+screen.onkey(zoom_in, 'plus')
+screen.onkey(zoom_out, 'minus')
+screen.onkey(goleft, 'Left')
+screen.onkey(goright, 'Right')
+screen.onkey(goup, 'Up')
+screen.onkey(godown, 'Down')
 screen.listen()
 turtle.tracer(0, 0)
 t = turtle.Turtle(visible=False)
@@ -129,12 +222,16 @@ t.ht()
 
 
 def draw_cell_color(x, y, col):
-    if x < MINX or x > MAXX:
+    maxx = CENTERX + WIDTH / (2 * CELL_SIZE) + 10
+    maxy = CENTERY + HEIGHT / (2 * CELL_SIZE) + 10
+    minx = CENTERX - WIDTH / (2 * CELL_SIZE) - 10
+    miny = CENTERY - HEIGHT / (2 * CELL_SIZE) - 10
+    if x < minx or x > maxx:
         return
-    if y < MINY or y > MAXY:
+    if y < miny or y > maxy:
         return
-    cx = x * CELL_SIZE
-    cy = y * CELL_SIZE
+    cx = (x - CENTERX) * CELL_SIZE
+    cy = (y - CENTERY) * CELL_SIZE
     t.color(col)
     t.setpos(cx, cy)
     t.pendown()
@@ -156,6 +253,8 @@ def undraw_cell(x, y):
 
 
 def draw():
+    if drawinfos:
+        draw_infos()
     turtle.update()
 
 
@@ -352,6 +451,7 @@ def add_file(x, y, filename, symx=False, symy=False, rot=0, time=0):
     coords, anticoords = _transform(coords, anticoords, symx, symy, rot, time)
     coords, anticoords = _offset(x, y, coords, anticoords)
 
+
     for i, j in coords:
         add_cell(i, j)
     for i, j in anticoords:
@@ -366,9 +466,8 @@ def add_glider_to_duplicator_1(xdupp, ydupp, dist):
 
 
 if __name__ == '__main__':
-    # add_file(-50, 50, 'guns/gliderlwssgun.cpx', rot=-1, time=300)
-    # add_file(100, 4, 'eaters/eater1.rle')
-    # add_file(51, -5, 'spaceships/glider.rle', rot=2)
-    add_file(-75, 75, 'guns/p144gliderlwssgun.cpx', time=180)
+    # add_file(5, -5, 'spaceships/glider.rle', rot=2)
+    # add_file(-6, 8, 'spaceships/glider.rle')
+    add_file(0, 0, 'experiments/block_2gliders_synthesis.cpx')
     draw()
     screen.mainloop()
